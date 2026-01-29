@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    // Users Collection
+    // Users can read their own profile to check role.
+    // Admin can read all users (if needed).
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow write: if false; // Only Admin SDK (Server Actions) or Console can write
+    }
+
+    // Attendance Collection
+    // Employees can read ONLY their own records.
+    // Admins can read ALL records.
+    // NO CLIENT WRITES allowed. All logic via Server Actions.
+    match /attendance/{recordId} {
+      allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
+      allow write: if false; 
+    }
+  }
+}
