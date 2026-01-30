@@ -76,22 +76,17 @@ export async function punchIn(idToken: string, lat: number, lng: number) {
         // Calculate Late
         let lateMinutes = 0;
         // Only calculate late if NOW > Grace End.
-        // If they come early (e.g. 10:28 for 10:30 start), NOW < OfficeStartUTC < GraceEndUTC.
-        // So this condition handles early arrival correctly (lateMinutes remains 0).
         if (now > graceEndUTC) {
             const diffMs = now.getTime() - officeStartUTC.getTime();
             lateMinutes = Math.floor(diffMs / 60000);
         }
 
-        // Calculate Required Punch Out (Shift Start + 9 hours + Late Minutes)
-        // "must be within 9 hours" usually implies 9 hours from start time? 
-        // Or 9 hours from Actual Punch In? 
-        // Previous logic: "Office End + Late Minutes". Office End was fixed 7 PM. 
-        // If Office Start 10:00 -> End 19:00. 
-        // Now dynamic: Start + 9 Hours.
-        const officeEndUTC = new Date(officeStartUTC.getTime() + (shiftDurationHours * 60 * 60 * 1000));
-
-        const requiredPunchOutUTC = new Date(officeEndUTC.getTime() + lateMinutes * 60000);
+        // Calculate Required Punch Out
+        // NEW LOGIC: Dynamic 9 Hours from ACTUAL Punch In Time.
+        // Prompt: "unka timer tabhi se calculate kre 9hrs tk... for example 10:30am shift wala employee 9:45am ko aaya toh they can leave by 6:45pm"
+        // Prompt: "if they log in by 10am so they can punchout without getting the half day"
+        // Result: Required Out = Actual Punch In + ShiftDuration (9h).
+        const requiredPunchOutUTC = new Date(now.getTime() + (shiftDurationHours * 60 * 60 * 1000));
 
         // 4. Save to Firestore
         await recordRef.set({
@@ -151,7 +146,18 @@ export async function punchOut(idToken: string, lat: number, lng: number, forceH
         }
 
         // 4. Validate Time vs Required
-        const requiredOut = data?.requiredPunchOut.toDate(); // This is correctly UTC
+        // FIXED LOGIC: Re-calculate requiredOut dynamically to ensure 9h rule applies even for existing records
+        // This handles "already punched in" users who might have old requiredTime logic.
+        const punchInTime = data?.punchIn?.time?.toDate();
+        if (!punchInTime) throw new Error("Invalid punch-in data");
+
+        // Determine Shift Duration (try to respect shiftStart if stored, else default 9h)
+        let shiftDurationHours = 9;
+        const shiftStart = data?.shiftStart || "10:00";
+        if (shiftStart.startsWith("13")) shiftDurationHours = 6.5;
+
+        // Dynamic 9h from Actual Punch In
+        const requiredOut = new Date(punchInTime.getTime() + (shiftDurationHours * 60 * 60 * 1000));
 
         let status = "Present";
 
@@ -160,22 +166,15 @@ export async function punchOut(idToken: string, lat: number, lng: number, forceH
             if (forceHalfDay) {
                 status = "Half Day";
             } else {
-                // If not forced and early, strictly speaking we should block or mark absent.
-                // The UI should handle the confirmation. If we are here, we allow it.
-                // But logic says: if early and NOT forced -> Absent. 
-                // However, user wants "Force Punch Out" option. 
-                // If they just click Punch Out early without force, it's Absent? 
-                // Or maybe we treat simple early punch out as Absent, and specific action as Half Day.
                 status = "Absent";
             }
         }
 
         // Calculate Overtime
-        // Logic: If they came ON TIME (Late == 0) and stayed AFTER Shift End.
         let overtimeMinutes = 0;
         let overtimeStatus = "none";
 
-        if (data && now > requiredOut) {
+        if (now > requiredOut) {
             const diffMs = now.getTime() - requiredOut.getTime();
             overtimeMinutes = Math.floor(diffMs / 60000); // Minutes worked extra beyond required 9h
         }
