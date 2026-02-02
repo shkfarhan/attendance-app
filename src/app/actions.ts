@@ -82,11 +82,22 @@ export async function punchIn(idToken: string, lat: number, lng: number) {
         }
 
         // Calculate Required Punch Out
-        // NEW LOGIC: Dynamic 9 Hours from ACTUAL Punch In Time.
-        // Prompt: "unka timer tabhi se calculate kre 9hrs tk... for example 10:30am shift wala employee 9:45am ko aaya toh they can leave by 6:45pm"
-        // Prompt: "if they log in by 10am so they can punchout without getting the half day"
-        // Result: Required Out = Actual Punch In + ShiftDuration (9h).
-        const requiredPunchOutUTC = new Date(now.getTime() + (shiftDurationHours * 60 * 60 * 1000));
+        // NEW LOGIC (Feb 2026 update):
+        // 1. If Early (Now < Start): Required = Actual + 9h.
+        // 2. If On Time/Grace (Start <= Now <= Grace): Required = Scheduled Start + 9h (e.g. 7 PM fixed).
+        // 3. If Late (Now > Grace): Required = Actual + 9h.
+
+        let requiredPunchOutUTC: Date;
+
+        // Check if within Grace Window (inclusive)
+        // Only applies if it's the regular shift (or if grace applies to others, but prompt specified 10am)
+        if (now >= officeStartUTC && now <= graceEndUTC) {
+            // Came in grace period -> Can leave at standard shift end (e.g. 10:00 -> 19:00)
+            requiredPunchOutUTC = new Date(officeStartUTC.getTime() + (shiftDurationHours * 60 * 60 * 1000));
+        } else {
+            // Early OR Late -> Strict 9h from arrival
+            requiredPunchOutUTC = new Date(now.getTime() + (shiftDurationHours * 60 * 60 * 1000));
+        }
 
         // 4. Save to Firestore
         await recordRef.set({
@@ -156,8 +167,34 @@ export async function punchOut(idToken: string, lat: number, lng: number, forceH
         const shiftStart = data?.shiftStart || "10:00";
         if (shiftStart.startsWith("13")) shiftDurationHours = 6.5;
 
-        // Dynamic 9h from Actual Punch In
-        const requiredOut = new Date(punchInTime.getTime() + (shiftDurationHours * 60 * 60 * 1000));
+        // Determine Shift Config (Start Hour/Min)
+        let startHour = 10;
+        let startMin = 0;
+        if (shiftStart.includes(":")) {
+            const parts = shiftStart.split(":");
+            startHour = parseInt(parts[0]);
+            startMin = parseInt(parts[1]);
+        }
+
+        const isRegularShift = (startHour === 10 && startMin === 0);
+        const currentGracePeriod = isRegularShift ? 10 : 0;
+
+        // Reconstruct Standard Start Time UTC
+        // todayStr is already defined in Scope (Step 3)
+        const officeStartStr = `${todayStr} ${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')}:00`;
+        const officeStartUTC = fromZonedTime(officeStartStr, TIME_ZONE);
+        const graceEndUTC = new Date(officeStartUTC.getTime() + currentGracePeriod * 60000);
+
+        // Dynamic 9h or Shift End Calculation
+        let requiredOut: Date;
+
+        if (punchInTime >= officeStartUTC && punchInTime <= graceEndUTC) {
+            // Was in Grace Period -> Fixed Exit Time (e.g. 7:00 PM)
+            requiredOut = new Date(officeStartUTC.getTime() + (shiftDurationHours * 60 * 60 * 1000));
+        } else {
+            // Early or Late -> Actual + 9h
+            requiredOut = new Date(punchInTime.getTime() + (shiftDurationHours * 60 * 60 * 1000));
+        }
 
         let status = "Present";
 
