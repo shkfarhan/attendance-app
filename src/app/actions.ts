@@ -29,10 +29,14 @@ export async function punchIn(idToken: string, lat: number, lng: number) {
         // Determine Shift Config
         let startHour = 10;
         let startMin = 0;
-        if (shiftStart.includes(":")) {
-            const parts = shiftStart.split(":");
-            startHour = parseInt(parts[0]);
-            startMin = parseInt(parts[1]);
+        const cleanShift = (shiftStart || "10:00").trim();
+        if (cleanShift.includes(":")) {
+            const parts = cleanShift.split(":");
+            // Safe parsing:
+            const h = parseInt(parts[0]);
+            const m = parseInt(parts[1]);
+            if (!isNaN(h)) startHour = h;
+            if (!isNaN(m)) startMin = m;
         }
 
         const isRegularShift = (startHour === 10 && startMin === 0);
@@ -73,6 +77,9 @@ export async function punchIn(idToken: string, lat: number, lng: number) {
 
         const graceEndUTC = new Date(officeStartUTC.getTime() + currentGracePeriod * 60000);
 
+        // Debug Logs
+        console.log(`PunchIn Debug: User=${userName}, Now=${now.toISOString()}, Start=${officeStartUTC.toISOString()}, GraceEnd=${graceEndUTC.toISOString()}`);
+
         // Calculate Late
         let lateMinutes = 0;
         // Only calculate late if NOW > Grace End.
@@ -89,14 +96,20 @@ export async function punchIn(idToken: string, lat: number, lng: number) {
 
         let requiredPunchOutUTC: Date;
 
-        // Check if within Grace Window (inclusive)
-        // Only applies if it's the regular shift (or if grace applies to others, but prompt specified 10am)
-        if (now >= officeStartUTC && now <= graceEndUTC) {
-            // Came in grace period -> Can leave at standard shift end (e.g. 10:00 -> 19:00)
-            requiredPunchOutUTC = new Date(officeStartUTC.getTime() + (shiftDurationHours * 60 * 60 * 1000));
+        // Using timestamps for comparison to avoid object equality issues
+        const nowTs = now.getTime();
+        const startTs = officeStartUTC.getTime();
+        const graceTs = graceEndUTC.getTime();
+
+        if (nowTs > graceTs) {
+            // Late
+            requiredPunchOutUTC = new Date(nowTs + (shiftDurationHours * 60 * 60 * 1000));
+        } else if (nowTs < startTs) {
+            // Early
+            requiredPunchOutUTC = new Date(nowTs + (shiftDurationHours * 60 * 60 * 1000));
         } else {
-            // Early OR Late -> Strict 9h from arrival
-            requiredPunchOutUTC = new Date(now.getTime() + (shiftDurationHours * 60 * 60 * 1000));
+            // In between Start and Grace End (Inclusive) -> Standard Exit
+            requiredPunchOutUTC = new Date(startTs + (shiftDurationHours * 60 * 60 * 1000));
         }
 
         // 4. Save to Firestore
@@ -170,10 +183,13 @@ export async function punchOut(idToken: string, lat: number, lng: number, forceH
         // Determine Shift Config (Start Hour/Min)
         let startHour = 10;
         let startMin = 0;
-        if (shiftStart.includes(":")) {
-            const parts = shiftStart.split(":");
-            startHour = parseInt(parts[0]);
-            startMin = parseInt(parts[1]);
+        const cleanShift = (shiftStart || "10:00").trim();
+        if (cleanShift.includes(":")) {
+            const parts = cleanShift.split(":");
+            const h = parseInt(parts[0]);
+            const m = parseInt(parts[1]);
+            if (!isNaN(h)) startHour = h;
+            if (!isNaN(m)) startMin = m;
         }
 
         const isRegularShift = (startHour === 10 && startMin === 0);
@@ -188,12 +204,19 @@ export async function punchOut(idToken: string, lat: number, lng: number, forceH
         // Dynamic 9h or Shift End Calculation
         let requiredOut: Date;
 
-        if (punchInTime >= officeStartUTC && punchInTime <= graceEndUTC) {
-            // Was in Grace Period -> Fixed Exit Time (e.g. 7:00 PM)
-            requiredOut = new Date(officeStartUTC.getTime() + (shiftDurationHours * 60 * 60 * 1000));
+        const punchTs = punchInTime.getTime();
+        const startTs = officeStartUTC.getTime();
+        const graceTs = graceEndUTC.getTime();
+
+        if (punchTs > graceTs) {
+            // Late -> Actual + 9h
+            requiredOut = new Date(punchTs + (shiftDurationHours * 60 * 60 * 1000));
+        } else if (punchTs < startTs) {
+            // Early -> Actual + 9h
+            requiredOut = new Date(punchTs + (shiftDurationHours * 60 * 60 * 1000));
         } else {
-            // Early or Late -> Actual + 9h
-            requiredOut = new Date(punchInTime.getTime() + (shiftDurationHours * 60 * 60 * 1000));
+            // Safe Zone -> Standard Exit
+            requiredOut = new Date(startTs + (shiftDurationHours * 60 * 60 * 1000));
         }
 
         let status = "Present";
@@ -240,7 +263,7 @@ export async function punchOut(idToken: string, lat: number, lng: number, forceH
 }
 
 // Admin Action: Update Attendance Record
-export async function updateAttendanceRecord(idToken: string, recordId: string, newPunchInTimeStr?: string, newPunchOutTimeStr?: string) {
+export async function updateAttendanceRecord(idToken: string, recordId: string, newPunchInTimeStr?: string, newPunchOutTimeStr?: string, newStatus?: string) {
     try {
         // 1. Verify Admin
         const decodedToken = await adminAuth.verifyIdToken(idToken);
@@ -377,6 +400,11 @@ export async function updateAttendanceRecord(idToken: string, recordId: string, 
         } else {
             // If we removed punch out (not implemented here) or still open
             updates.status = "Working";
+        }
+
+        // Override Status if provided manually (Admin Force Update)
+        if (newStatus) {
+            updates.status = newStatus;
         }
 
         await recordRef.update(updates);

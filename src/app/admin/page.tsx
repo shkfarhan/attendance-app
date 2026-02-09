@@ -55,6 +55,7 @@ export default function AdminDashboard() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editIn, setEditIn] = useState("");
     const [editOut, setEditOut] = useState("");
+    const [editStatus, setEditStatus] = useState("");
     const [saving, setSaving] = useState(false);
 
     // Report State
@@ -133,12 +134,14 @@ export default function AdminDashboard() {
         const outTime = record.punchOut ? format(record.punchOut.time.toDate(), "HH:mm") : "";
         setEditIn(inTime);
         setEditOut(outTime);
+        setEditStatus(record.status || "Present");
     };
 
     const cancelEdit = () => {
         setEditingId(null);
         setEditIn("");
         setEditOut("");
+        setEditStatus("");
     };
 
     const saveEdit = async () => {
@@ -149,7 +152,7 @@ export default function AdminDashboard() {
             if (!user) return;
             const token = await user.getIdToken();
 
-            const result = await updateAttendanceRecord(token, editingId, editIn, editOut);
+            const result = await updateAttendanceRecord(token, editingId, editIn, editOut, editStatus);
             if (result.success) {
                 setEditingId(null);
             } else {
@@ -511,7 +514,21 @@ export default function AdminDashboard() {
                                                         )}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${record.status === "Present" ? "bg-green-100 text-green-800" : record.status === "Absent" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}>{record.status}</span>
+                                                        {editingId === record.id ? (
+                                                            <Select value={editStatus} onValueChange={setEditStatus}>
+                                                                <SelectTrigger className="w-[120px] h-8 text-xs">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="Present">Present</SelectItem>
+                                                                    <SelectItem value="Half Day">Half Day</SelectItem>
+                                                                    <SelectItem value="Absent">Absent</SelectItem>
+                                                                    <SelectItem value="Working">Working</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        ) : (
+                                                            <span className={`px-2 py-1 rounded text-xs font-semibold ${record.status === "Present" ? "bg-green-100 text-green-800" : record.status === "Absent" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}>{record.status}</span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         {editingId === record.id ? (
@@ -567,7 +584,21 @@ export default function AdminDashboard() {
                                                     <h3 className="font-semibold text-gray-900">{displayName}</h3>
                                                     <p className="text-xs text-muted-foreground">{displayEmail}</p>
                                                 </div>
-                                                <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${record.status === "Present" ? "bg-green-100 text-green-700" : record.status === "Absent" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{record.status}</span>
+                                                {editingId === record.id ? (
+                                                    <Select value={editStatus} onValueChange={setEditStatus}>
+                                                        <SelectTrigger className="w-[100px] h-7 text-[10px] font-bold uppercase tracking-wide">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="Present">Present</SelectItem>
+                                                            <SelectItem value="Half Day">Half Day</SelectItem>
+                                                            <SelectItem value="Absent">Absent</SelectItem>
+                                                            <SelectItem value="Working">Working</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                ) : (
+                                                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${record.status === "Present" ? "bg-green-100 text-green-700" : record.status === "Absent" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{record.status}</span>
+                                                )}
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-3 rounded-md">
