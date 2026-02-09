@@ -417,6 +417,25 @@ export async function updateAttendanceRecord(idToken: string, recordId: string, 
     }
 }
 
+// Clear Late Remark
+export async function clearLateRemark(idToken: string, recordId: string) {
+    try {
+        const decodedToken = await adminAuth.verifyIdToken(idToken);
+        const adminUid = decodedToken.uid;
+        const userDoc = await adminDb.collection("users").doc(adminUid).get();
+        if (userDoc.data()?.role !== "admin") throw new Error("Unauthorized");
+
+        await adminDb.collection("attendance").doc(recordId).update({
+            lateMinutes: 0
+        });
+
+        return { success: true, message: "Late remark removed" };
+    } catch (error: any) {
+        console.error("Clear Late Error:", error);
+        return { success: false, error: error.message };
+    }
+}
+
 export async function deleteAttendanceRecord(idToken: string, recordId: string) {
     try {
         // 1. Verify Admin

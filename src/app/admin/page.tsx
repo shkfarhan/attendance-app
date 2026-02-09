@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc, orderBy, onSnapshot } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { updateAttendanceRecord, deleteAttendanceRecord, approveOvertime, addHoliday, deleteHoliday } from "../actions";
+import { updateAttendanceRecord, deleteAttendanceRecord, approveOvertime, addHoliday, deleteHoliday, clearLateRemark } from "../actions";
 import { generateMonthlyReport } from "../report-action";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +40,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { formatDuration } from "@/lib/utils";
-import { Loader2, Download, LogOut, Edit2, X, Save, Trash2, CheckCircle, XCircle, CalendarDays, Plus } from "lucide-react";
+import { Loader2, Download, LogOut, Edit2, X, Save, Trash2, CheckCircle, XCircle, CalendarDays, Plus, Eraser } from "lucide-react";
 
 
 
@@ -142,6 +142,17 @@ export default function AdminDashboard() {
         setEditIn("");
         setEditOut("");
         setEditStatus("");
+    };
+
+    const handleClearLate = async (recordId: string) => {
+        if (!confirm("Are you sure you want to remove the Late Remark?")) return;
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) return;
+            await clearLateRemark(token, recordId);
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     const saveEdit = async () => {
@@ -495,7 +506,16 @@ export default function AdminDashboard() {
                                                             <td className="px-4 py-3 whitespace-nowrap">{record.punchOut ? format(record.punchOut.time.toDate(), "hh:mm a") : "-"}</td>
                                                         </>
                                                     )}
-                                                    <td className={`px-4 py-3 whitespace-nowrap ${record.lateMinutes > 0 ? "text-red-600 font-bold" : ""}`}>{formatDuration(record.lateMinutes)}</td>
+                                                    <td className={`px-4 py-3 whitespace-nowrap ${record.lateMinutes > 0 ? "text-red-600 font-bold" : ""}`}>
+                                                        <div className="flex items-center gap-2">
+                                                            {formatDuration(record.lateMinutes)}
+                                                            {record.lateMinutes > 0 && !editingId && (
+                                                                <Button size="icon" variant="ghost" className="h-5 w-5 text-gray-400 hover:text-blue-600" onClick={() => handleClearLate(record.id)} title="Remove Late Remark">
+                                                                    <Eraser className="h-3 w-3" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </td>
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         {record.overtimeMinutes > 0 ? (
                                                             <div className="flex flex-col gap-1 items-start">
