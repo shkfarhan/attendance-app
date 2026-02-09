@@ -459,14 +459,14 @@ export default function AdminDashboard() {
                             <table className="w-full text-sm text-left">
                                 <thead className="text-xs text-gray-700 uppercase bg-gray-100">
                                     <tr>
-                                        <th className="px-6 py-3">Employee</th>
-                                        <th className="px-6 py-3">Email</th>
-                                        <th className="px-6 py-3">Punch In</th>
-                                        <th className="px-6 py-3">Punch Out</th>
-                                        <th className="px-6 py-3">Late (min)</th>
-                                        <th className="px-6 py-3">Overtime</th>
-                                        <th className="px-6 py-3">Status</th>
-                                        <th className="px-6 py-3">Actions</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Employee</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Email</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Punch In</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Punch Out</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Late (min)</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Overtime</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Status</th>
+                                        <th className="px-4 py-3 whitespace-nowrap text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -482,21 +482,21 @@ export default function AdminDashboard() {
 
                                             return (
                                                 <tr key={i} className="bg-white border-b hover:bg-gray-50">
-                                                    <td className="px-6 py-4 font-medium text-gray-900">{displayName}</td>
-                                                    <td className="px-6 py-4 text-muted-foreground">{displayEmail}</td>
+                                                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{displayName}</td>
+                                                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{displayEmail}</td>
                                                     {editingId === record.id ? (
                                                         <>
-                                                            <td className="px-6 py-4"><Input type="time" value={editIn} onChange={e => setEditIn(e.target.value)} className="w-32" /></td>
-                                                            <td className="px-6 py-4"><Input type="time" value={editOut} onChange={e => setEditOut(e.target.value)} className="w-32" /></td>
+                                                            <td className="px-4 py-3 whitespace-nowrap"><Input type="time" value={editIn} onChange={e => setEditIn(e.target.value)} className="w-28 h-8 text-xs" /></td>
+                                                            <td className="px-4 py-3 whitespace-nowrap"><Input type="time" value={editOut} onChange={e => setEditOut(e.target.value)} className="w-28 h-8 text-xs" /></td>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <td className="px-6 py-4">{record.punchIn ? format(record.punchIn.time.toDate(), "hh:mm a") : "-"}</td>
-                                                            <td className="px-6 py-4">{record.punchOut ? format(record.punchOut.time.toDate(), "hh:mm a") : "-"}</td>
+                                                            <td className="px-4 py-3 whitespace-nowrap">{record.punchIn ? format(record.punchIn.time.toDate(), "hh:mm a") : "-"}</td>
+                                                            <td className="px-4 py-3 whitespace-nowrap">{record.punchOut ? format(record.punchOut.time.toDate(), "hh:mm a") : "-"}</td>
                                                         </>
                                                     )}
-                                                    <td className={`px-6 py-4 ${record.lateMinutes > 0 ? "text-red-600 font-bold" : ""}`}>{formatDuration(record.lateMinutes)}</td>
-                                                    <td className="px-6 py-4">
+                                                    <td className={`px-4 py-3 whitespace-nowrap ${record.lateMinutes > 0 ? "text-red-600 font-bold" : ""}`}>{formatDuration(record.lateMinutes)}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">
                                                         {record.overtimeMinutes > 0 ? (
                                                             <div className="flex flex-col gap-1 items-start">
                                                                 <span className="font-semibold text-gray-900">{formatDuration(record.overtimeMinutes)}</span>
@@ -513,7 +513,7 @@ export default function AdminDashboard() {
                                                             <span className="text-muted-foreground">-</span>
                                                         )}
                                                     </td>
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-4 py-3 whitespace-nowrap">
                                                         {editingId === record.id ? (
                                                             <Select value={editStatus} onValueChange={setEditStatus}>
                                                                 <SelectTrigger className="w-[120px] h-8 text-xs">
@@ -530,7 +530,7 @@ export default function AdminDashboard() {
                                                             <span className={`px-2 py-1 rounded text-xs font-semibold ${record.status === "Present" ? "bg-green-100 text-green-800" : record.status === "Absent" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}>{record.status}</span>
                                                         )}
                                                     </td>
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-4 py-3 whitespace-nowrap text-right">
                                                         {editingId === record.id ? (
                                                             <div className="flex gap-2">
                                                                 <Button size="sm" variant="default" onClick={saveEdit} disabled={saving}><Save className="h-4 w-4" /></Button>
